@@ -1,0 +1,3 @@
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/cmake-build-debug/CMakeFiles/AircraftProject.dir

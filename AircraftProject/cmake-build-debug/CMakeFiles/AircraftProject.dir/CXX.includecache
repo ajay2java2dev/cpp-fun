@@ -1,0 +1,34 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Aircraft.cpp
+Aircraft.h
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Aircraft.h
+
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Aircraft.h
+string
+-
+iostream
+-
+
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Fighter.cpp
+Fighter.h
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Fighter.h
+
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Fighter.h
+Aircraft.h
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Aircraft.h
+
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/main.cpp
+iostream
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/iostream
+Fighter.h
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/Fighter.h
+vector
+/Users/ajay/CLionProjects/cpp-fun/AircraftProject/vector
+
