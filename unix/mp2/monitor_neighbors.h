@@ -13,8 +13,11 @@
 
 #define M 255
 #define N 255
+#define BLOCK 255
 
 extern int fw_table[M][N];
+
+extern char *theLogFileName;
 
 extern int globalMyID;
 //last time you heard from each node. TODO: you will want to monitor this
@@ -57,13 +60,15 @@ void* announceToNeighbors(void* unusedParam)
 void listenForNeighbors()
 {
 	//printf("\ninside listen for neighbour");
-	FILE *theLogFile = fopen ("log.txt", "w");
-		
+	
 	char fromAddr[100];
 	struct sockaddr_in theirAddr;
 	socklen_t theirAddrLen;
 	unsigned char recvBuf[1000];
 
+	char logLine[8] = {};
+	FILE *theLogFile = fopen(theLogFileName, "w+");
+	
 	int bytesRecvd;
 	while(1)
 	{
@@ -77,7 +82,6 @@ void listenForNeighbors()
 		
 		inet_ntop(AF_INET, &theirAddr.sin_addr, fromAddr, 100);
 
-		char logLine[1024];
 		recvBuf[bytesRecvd] = '\0';
 		
 		/*
@@ -98,14 +102,14 @@ void listenForNeighbors()
 
 		int cost = fw_table[globalMyID][be_value];
 		nextHop = be_value;
-		printf("cost %d\n",cost);
+		//printf("cost %d\n",cost);
 		
 		if (cost <= 0) {
 			memcpy(arr,fw_table[globalMyID],N);
 
 			for (int i = 0; i < sizeof(arr); i++) {
 				if (arr[i] > 0){
-					printf("\nnode : %d\n",arr[i]); 	
+					//printf("\nnode : %d\n",arr[i]); 	
 					if (i == be_value) {
 						nextHop = i;
 						break;
@@ -123,7 +127,6 @@ void listenForNeighbors()
 			//record that we heard from heardFrom just now.
 
 			sprintf(logLine, "heard heartbeat from ... %d",heardFrom);
-			printf("%s",logLine);
 
 			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
 		}
@@ -135,9 +138,6 @@ void listenForNeighbors()
 			//TODO send the requested message to the requested destination node
 			// ...
 			sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",be_value,nextHop,recvBuf+6);
-			printf("%s",logLine);
-
-			fwrite(logLine, 1, strlen(logLine),theLogFile);
 		}
 		//'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
 		else if(!strncmp(recvBuf, "cost", 4))
@@ -146,13 +146,16 @@ void listenForNeighbors()
 			//this is the new cost you should treat it as having once it comes back up.)
 			// ...
 			sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",be_value,nextHop,recvBuf+6);
-			printf("%s",logLine);
-
-			fwrite(logLine, 1, strlen(logLine),theLogFile);
 		}
-		
-		
-		//printf("\ndo other changes here");
+			
+		//do other changes here");
+		if (theLogFile != NULL) {
+			printf("\nprinting to file\n");
+			theLogFile = fopen(theLogFileName, "a");
+			fprintf(theLogFile, "%s",logLine);
+			fclose(theLogFile);
+		}
+
 		//TODO now check for the various types of packets you use in your own protocol
 		//else if(!strncmp(recvBuf, "your other message types", ))
 		// ... 

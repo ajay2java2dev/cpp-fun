@@ -7,6 +7,7 @@ void listenForNeighbors();
 void* announceToNeighbors(void* unusedParam);
 
 int fw_table[M][N];
+char *theLogFileName;
 
 int globalMyID = 0;
 //last time you heard from each node. TODO: you will want to monitor this
@@ -45,7 +46,7 @@ int main(int argc, char** argv)
 	}
 	
 	//TODO: read and parse initial costs file. default to cost 1 if no entry for a node. file may be empty.
-	FILE *logLine = fopen (argv[4], "w");
+	theLogFileName = argv[3];
 
 	FILE *file = fopen (argv[2], "r");
 	if (file == NULL) {
