@@ -5,6 +5,7 @@
 
 void listenForNeighbors();
 void* announceToNeighbors(void* unusedParam);
+void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N], struct fw_table *ft);
 
 char *theLogFileName;
 

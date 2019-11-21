@@ -18,7 +18,7 @@
 #define BLOCK 255
 
 //forwarding / routing table to be constructed for each node
-extern struct fw_table {
+struct fw_table {
 	unsigned dist[M];
 	unsigned next[N];
 }ft[M];
@@ -91,7 +91,7 @@ void printGraph(int graph[M][N]) {
 }
 
 void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N]
-		, struct fw_table ft[M]) {
+				, struct fw_table *ft) {
 
 	int count =0;
 	printf("\nCalculating distance vector ...");
@@ -236,7 +236,7 @@ void listenForNeighbors()
 	printf("\n ft5 ...");
 
 	if (ft != NULL) {
-		calculateDistanceVector(M, cost_matrix, ft);
+		calculateDistanceVector(M, cost_matrix,&ft);
 	} else {
 		printf("\nfw table is null");
 	}
