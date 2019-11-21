@@ -13,16 +13,15 @@
 
 #include<stdbool.h>
 
-//forwarding / routing table to be constructed for each node
-typedef struct {
-	unsigned dist[INT32_MAX];
-	unsigned next[256];
-}fw_table[256];
-
-
 #define M 255
 #define N 255
 #define BLOCK 255
+
+//forwarding / routing table to be constructed for each node
+extern struct fw_table {
+	unsigned dist[M];
+	unsigned next[N];
+}ft[M];
 
 extern int cost_matrix[M][N];
 
@@ -91,9 +90,9 @@ void printGraph(int graph[M][N]) {
 	}
 }
 
-void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N]) {
+void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N]
+		, struct fw_table ft[M]) {
 
-	fw_table ft = {0};
 	int count =0;
 	printf("\nCalculating distance vector ...");
 	
@@ -225,11 +224,19 @@ void listenForNeighbors()
 	FILE *theLogFile = fopen(theLogFileName, "w+");
 
 	printf("\ninside listen for neighbour");
-	
-	fw_table ft = {0};
-	
+	struct fw_table *ft = {0};
+	printf("\n ft1 ...");
+	memset(&ft, 0, sizeof(ft) * 256);
+	printf("\n ft2 ...");
+	ft = (struct fw_table*) malloc (sizeof(struct fw_table));
+	printf("\n ft3 ...");
+	memset(&ft->dist, 0, sizeof(ft->dist));
+	printf("\n ft4 ...");
+	memset(&ft->next, 0, sizeof(ft->next));
+	printf("\n ft5 ...");
+
 	if (ft != NULL) {
-		calculateDistanceVector(M, cost_matrix);
+		calculateDistanceVector(M, cost_matrix, ft);
 	} else {
 		printf("\nfw table is null");
 	}
