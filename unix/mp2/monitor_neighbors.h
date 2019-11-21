@@ -11,11 +11,20 @@
 #include <netdb.h>
 #include <pthread.h>
 
+#include<stdbool.h>
+
+//forwarding / routing table to be constructed for each node
+typedef struct {
+	unsigned dist[INT32_MAX];
+	unsigned next[256];
+}fw_table[256];
+
+
 #define M 255
 #define N 255
 #define BLOCK 255
 
-extern int fw_table[M][N];
+extern int cost_matrix[M][N];
 
 extern char *theLogFileName;
 
@@ -57,17 +66,173 @@ void* announceToNeighbors(void* unusedParam)
 	}
 }
 
+void logToFile(char *theLogFileName, char *logLine) {
+	if (theLogFileName != NULL) {
+		printf("\nprinting to file\n");
+		FILE *theLogFile = fopen(theLogFileName, "a");
+		fprintf(theLogFile, "%s",logLine);
+		fclose(theLogFile);
+	} else {
+		printf("Unable to print to file. The log file name is null ...");
+	}
+}
+
+void printGraph(int graph[M][N]) {
+	if (graph != NULL) {
+		printf("\n################################\n");
+		for (int i = 0; i < M; i++) {
+			for (int j = 0; j < N; j++) {
+				if (graph[i][j] > 0) {
+					printf("\n| [%d][%d], cost  = %d |",i,j,graph[i][j]);
+				}
+			}			
+		}
+		printf("\n################################\n");
+	}
+}
+
+void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N]) {
+
+	fw_table ft = {0};
+	int count =0;
+	printf("\nCalculating distance vector ...");
+	
+	for (int i =0; i < num_of_nodes ; i++) {
+		for (int j = 0; j< num_of_nodes; j++) {
+			
+			new_cost_matrix[i][i] = 0;
+			ft[i].dist[j] = new_cost_matrix[i][j];
+			ft[i].next[j] = j;
+
+		}
+	}
+
+	do {
+		
+		for (int i =0; i < num_of_nodes; i++) {
+			for (int j =0; j < num_of_nodes; j++) {
+				for (int k =0; k < num_of_nodes; i++) {
+					//relaxation logic applied here...
+					if (ft[i].dist[j] > new_cost_matrix[i][k] + ft[k].dist[j]) {
+						
+						ft[i].dist[j] = ft[i].dist[k] + ft[k].dist[j];
+						ft[i].next[j] = k;
+						count++;
+					}
+				}
+			}
+		}
+	} while (count != 0);
+
+	for (int i =0; i < num_of_nodes; i++) {
+		printf("\n\nState value for router %d is \n",i);
+		for (int j =0; j < num_of_nodes; j++) {
+			printf("\t\nnode %d via %d Distance %d",j, ft[i].next[j], ft[i].dist[j]);
+		}
+	}
+}
+/*
+int minimumDistance (int dist[], bool sptSet[]) {
+	int min = INT8_MAX, min_index;
+
+	for (int node = 0; node < M; node++) {
+		if (sptSet[node] == false && dist[node] <= min) {
+			min = dist[node], min_index = node;			
+		}
+	}
+	//printf("\nreturning minimum index : %d and min value %d", min_index, min);
+	return min_index;
+}
+
+//single source shorted path algorithm
+void calculateShortestPathForAllNodes(int graph[M][N], int src, int *dist) {
+	
+	//removed dist from local param to pass a param due to memory constraints.
+	//int dist[M]; //to hold the shortest distance from src to node/vertex i.
+	
+	bool sptSet[M]; //node/vertex i will be true if node is included in shortest path
+
+	for (int i = 0; i < M; i++) {
+		dist[i] = INT32_MAX, sptSet[i] = false; //resetting out temp array
+	}
+
+	dist[src] = 0; //distance of the global node to itself is 0;
+
+	//relaxation for all nodes
+	for (int count = 0; count < M-1; count++) {
+		int u = minimumDistance(dist, sptSet);
+		
+		sptSet[u] = true;
+
+		for (int v = 0; v < M; v++) {
+			if (!sptSet[v] && graph[u][v] && dist[u] != INT32_MAX
+				&& dist[u] + graph[u][v] < dist[v]) {
+				dist[v] = dist[u] + graph[u][v];
+			}
+		}
+	}
+
+
+	printf("Vertex \t\t Distance from Source \n");
+	for (int i =0; i < M; i++)
+		printf("%d \t\t %d\n",i,dist[i]);	
+}
+*/
+
+void sendOrForwardToDestination (int dest_node, char *message) {
+	int numbytes;
+	int sockfd;
+	int broadcast = 1;
+	struct sockaddr_in their_addr;
+	char theirAddr[100];
+
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		perror("socket");
+		exit(1);
+	}
+
+	if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast,
+		sizeof broadcast) == -1) {
+		perror("setsockopt (SO_BROADCAST)");
+		exit(1);
+	}
+	
+	sprintf(theirAddr, "10.1.1.%d", dest_node);	
+	printf("\n%s\n", theirAddr);
+
+	memset(&theirAddr, 0, sizeof(theirAddr));
+	
+	//FIXME: Do we need to set the broadcast settings ... 
+	their_addr.sin_family = AF_INET;
+	their_addr.sin_port = htons(7777);
+	inet_pton(AF_INET, theirAddr, &their_addr.sin_addr);
+
+	if ((numbytes = sendto(sockfd,message, strlen(message), 0,
+		(struct sockaddr *)&their_addr, sizeof their_addr)) == -1) {
+		perror("sendto");
+		exit(1);
+	}
+}
+
 void listenForNeighbors()
 {
-	//printf("\ninside listen for neighbour");
-	
 	char fromAddr[100];
 	struct sockaddr_in theirAddr;
 	socklen_t theirAddrLen;
 	unsigned char recvBuf[1000];
-
-	char logLine[8] = {};
+	
+	char logLine[1024] = {};
 	FILE *theLogFile = fopen(theLogFileName, "w+");
+
+	printf("\ninside listen for neighbour");
+	
+	fw_table ft = {0};
+	
+	if (ft != NULL) {
+		calculateDistanceVector(M, cost_matrix);
+	} else {
+		printf("\nfw table is null");
+	}
 	
 	int bytesRecvd;
 	while(1)
@@ -83,40 +248,22 @@ void listenForNeighbors()
 		inet_ntop(AF_INET, &theirAddr.sin_addr, fromAddr, 100);
 
 		recvBuf[bytesRecvd] = '\0';
-		
-		/*
-		unsigned short int le_value = (recvBuf+4)[0] + ((recvBuf+4)[1] << 8);
-		*/
-		unsigned short int be_value = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8);
-		int nextHop = -1;
-		
-		//printf("\naction %s heard from %s, dest_node : %d, msg recvd: %s",recvBuf,fromAddr,be_value,recvBuf+6);
+				
+		//unsigned short int le_value = (recvBuf+4)[0] + ((recvBuf+4)[1] << 8); //little_endian value
+		unsigned short int dest_node = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8); //big_endian value
+		char * message = recvBuf+6;
 
-		if (fw_table == NULL) {
-			perror("Forwarding table is empty: cannot proceed");
-			exit(1);
-		}
+		printf("\naction %s heard from %s, dest_node : %d, msg recvd: %s\n",recvBuf,fromAddr,dest_node,message);
 		
 		int arr[M];
 		int nearest_neig_cost = -1;
 
-		int cost = fw_table[globalMyID][be_value];
-		nextHop = be_value;
-		//printf("cost %d\n",cost);
-		
-		if (cost <= 0) {
-			memcpy(arr,fw_table[globalMyID],N);
+		int cost = ft[dest_node].dist[globalMyID];
+		int nextHop = ft[dest_node].next[globalMyID];
+		//int cost = 0;
+		//int nextHop = 0;
 
-			for (int i = 0; i < sizeof(arr); i++) {
-				if (arr[i] > 0){
-					//printf("\nnode : %d\n",arr[i]); 	
-					if (i == be_value) {
-						nextHop = i;
-						break;
-					}
-				}
-			}
-		}
+		printf("cost from %d to %d seems to be : %d\n",globalMyID,nextHop,cost);
 		
 		short int heardFrom = -1;
 		if(strstr(fromAddr, "10.1.1."))
@@ -127,7 +274,7 @@ void listenForNeighbors()
 			//record that we heard from heardFrom just now.
 
 			sprintf(logLine, "heard heartbeat from ... %d",heardFrom);
-
+			logToFile(theLogFileName,logLine);
 			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
 		}
 		
@@ -137,7 +284,25 @@ void listenForNeighbors()
 		{
 			//TODO send the requested message to the requested destination node
 			// ...
-			sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",be_value,nextHop,recvBuf+6);
+			if (cost == 0) {
+
+				sprintf(logLine, "receive packet message %s\n", message);
+				logToFile(theLogFileName,logLine);
+
+			} else if (cost == INT32_MAX) {
+			
+				sprintf(logLine, "unreachable node %d\n", dest_node);
+				logToFile(theLogFileName,logLine);
+
+			} else {
+				
+				sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",dest_node,nextHop,message);
+				logToFile(theLogFileName,logLine);
+				printf("\n%s\n", logLine);
+				sendOrForwardToDestination(dest_node, message);
+				
+			}
+			
 		}
 		//'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
 		else if(!strncmp(recvBuf, "cost", 4))
@@ -145,20 +310,15 @@ void listenForNeighbors()
 			//TODO record the cost change (remember, the link might currently be down! in that case,
 			//this is the new cost you should treat it as having once it comes back up.)
 			// ...
-			sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",be_value,nextHop,recvBuf+6);
+			sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",dest_node,nextHop,recvBuf+6);
+			logToFile(theLogFileName,logLine);
 		}
 			
 		//do other changes here");
-		if (theLogFile != NULL) {
-			printf("\nprinting to file\n");
-			theLogFile = fopen(theLogFileName, "a");
-			fprintf(theLogFile, "%s",logLine);
-			fclose(theLogFile);
-		}
-
+		
 		//TODO now check for the various types of packets you use in your own protocol
 		//else if(!strncmp(recvBuf, "your other message types", ))
-		// ... 
+		// ...
 	}
 	//(should never reach here)
 	close(globalSocketUDP);

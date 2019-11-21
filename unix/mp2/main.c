@@ -6,8 +6,9 @@
 void listenForNeighbors();
 void* announceToNeighbors(void* unusedParam);
 
-int fw_table[M][N];
 char *theLogFileName;
+
+int cost_matrix[M][N];
 
 int globalMyID = 0;
 //last time you heard from each node. TODO: you will want to monitor this
@@ -19,7 +20,8 @@ int globalSocketUDP;
 //pre-filled for sending to 10.1.1.0 - 255, port 7777
 struct sockaddr_in globalNodeAddrs[256];
 
- 
+//struct fw_table ft[M] = {0};
+
 int main(int argc, char** argv)
 {
 	if(argc != 4)
@@ -27,7 +29,6 @@ int main(int argc, char** argv)
 		fprintf(stderr, "Usage: %s mynodeid initialcostsfile logfile\n\n", argv[0]);
 		exit(1);
 	}
-	
 	
 	//initialization: get this process's node ID, record what time it is, 
 	//and set up our sockaddr_in's for sending to the other nodes.
@@ -53,6 +54,11 @@ int main(int argc, char** argv)
 		perror("Unable to open file!");
 		exit(1);
 	}
+
+	//initialize 255 * 255 table matrix.
+	for (int i =0; i < M ; i++) {
+		cost_matrix[i][i] = 0;
+	}
 	
 	char line[128];
 	while (fgets(line, sizeof line, file) != NULL) {
@@ -77,10 +83,11 @@ int main(int argc, char** argv)
 
 			token = strtok(NULL, "-");
 		}
-
-		fw_table[globalMyID][nodeid] = cost;
-		//printf("\nnode id: %d, cost: %d\n",nodeid, cost);
-		//printf("cost from %d to %d is : %d\n",globalMyID, nodeid,fw_table[globalMyID][nodeid]);
+		
+		cost_matrix[globalMyID][nodeid] = cost;
+		cost_matrix[nodeid][globalMyID] = cost;
+		printf("\ninitial cost %d to %d is : %d", globalMyID, nodeid, cost);
+		
 	}
 
 	fclose(file);
@@ -99,15 +106,19 @@ int main(int argc, char** argv)
 	bindAddr.sin_family = AF_INET;
 	bindAddr.sin_port = htons(7777);
 	inet_pton(AF_INET, myAddr, &bindAddr.sin_addr);
+	
+	printf("\nhere");
+
 	if(bind(globalSocketUDP, (struct sockaddr*)&bindAddr, sizeof(struct sockaddr_in)) < 0)
 	{
 		perror("bind");
 		close(globalSocketUDP);
 		exit(1);
 	}
-		
+	printf("\nhere");
+			
 	//start threads... feel free to add your own, and to remove the provided ones.
-	//printf("\nstart threads... feel free to add your own, and to remove the provided ones.");
+	printf("\nstart threads... feel free to add your own, and to remove the provided ones.");
 	pthread_t announcerThread;
 	pthread_create(&announcerThread, 0, announceToNeighbors, (void*)0);
 	
