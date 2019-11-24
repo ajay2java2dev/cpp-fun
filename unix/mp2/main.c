@@ -5,12 +5,12 @@
 
 void listenForNeighbors();
 void* announceToNeighbors(void* unusedParam);
-void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N], struct fw_table *ft);
 
 char *theLogFileName;
 
 int cost_matrix[M][N];
 
+int intialNodeSize = 0;
 int globalMyID = 0;
 //last time you heard from each node. TODO: you will want to monitor this
 //in order to realize when a neighbor has gotten cut off from you.
@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 	
 	//TODO: read and parse initial costs file. default to cost 1 if no entry for a node. file may be empty.
 	theLogFileName = argv[3];
-
+	
 	FILE *file = fopen (argv[2], "r");
 	if (file == NULL) {
 		perror("Unable to open file!");
@@ -57,11 +57,14 @@ int main(int argc, char** argv)
 	}
 
 	//initialize 255 * 255 table matrix.
-	for (int i =0; i < M ; i++) {
-		cost_matrix[i][i] = 0;
+	for (int i =0; i < M+1 ; i++) {
+		for (int j =0; j < N+1 ; j++) {
+			cost_matrix[i][j] = 0;			
+		}
 	}
 	
 	char line[128];
+
 	while (fgets(line, sizeof line, file) != NULL) {
 		
 		struct addrinfo *res;
@@ -87,8 +90,7 @@ int main(int argc, char** argv)
 		
 		cost_matrix[globalMyID][nodeid] = cost;
 		cost_matrix[nodeid][globalMyID] = cost;
-		printf("\ninitial cost %d to %d is : %d", globalMyID, nodeid, cost);
-		
+		intialNodeSize++;
 	}
 
 	fclose(file);
@@ -108,18 +110,14 @@ int main(int argc, char** argv)
 	bindAddr.sin_port = htons(7777);
 	inet_pton(AF_INET, myAddr, &bindAddr.sin_addr);
 	
-	printf("\nhere");
-
 	if(bind(globalSocketUDP, (struct sockaddr*)&bindAddr, sizeof(struct sockaddr_in)) < 0)
 	{
 		perror("bind");
 		close(globalSocketUDP);
 		exit(1);
 	}
-	printf("\nhere");
-			
+	
 	//start threads... feel free to add your own, and to remove the provided ones.
-	printf("\nstart threads... feel free to add your own, and to remove the provided ones.");
 	pthread_t announcerThread;
 	pthread_create(&announcerThread, 0, announceToNeighbors, (void*)0);
 	

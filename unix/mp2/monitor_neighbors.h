@@ -19,13 +19,14 @@
 
 //forwarding / routing table to be constructed for each node
 struct fw_table {
-	unsigned dist[M];
-	unsigned next[N];
+	int dist[M];
+	int from[N];
 }ft[M];
 
 extern int cost_matrix[M][N];
 
 extern char *theLogFileName;
+extern int intialNodeSize;
 
 extern int globalMyID;
 //last time you heard from each node. TODO: you will want to monitor this
@@ -67,7 +68,6 @@ void* announceToNeighbors(void* unusedParam)
 
 void logToFile(char *theLogFileName, char *logLine) {
 	if (theLogFileName != NULL) {
-		printf("\nprinting to file\n");
 		FILE *theLogFile = fopen(theLogFileName, "a");
 		fprintf(theLogFile, "%s",logLine);
 		fclose(theLogFile);
@@ -90,43 +90,56 @@ void printGraph(int graph[M][N]) {
 	}
 }
 
-void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N]
-				, struct fw_table *ft) {
+void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N]) {
 
 	int count =0;
-	printf("\nCalculating distance vector ...");
-	
-	for (int i =0; i < num_of_nodes ; i++) {
-		for (int j = 0; j< num_of_nodes; j++) {
-			
-			new_cost_matrix[i][i] = 0;
-			ft[i].dist[j] = new_cost_matrix[i][j];
-			ft[i].next[j] = j;
 
+	//printf("\nprinting new cost matrix ... num of nodes %d", num_of_nodes);
+
+	for (int i =0;i < M; i++){
+		for (int j =0; j < N; j++) {
+			new_cost_matrix[i][i] = 0;
+			
+			if (new_cost_matrix[i][j] > 0
+					&& new_cost_matrix[i][j] != INT32_MAX) {
+				ft[i].dist[j] = new_cost_matrix[i][j];
+				ft[i].from[j] = j;
+				printf("\ndistance from %d to %d is : %d",i,j,ft[i].dist[j]);
+			} else {
+				ft[i].dist[j] = 0;
+				ft[i].from[j] = INT32_MAX;
+			}			
 		}
 	}
-
+	
 	do {
-		
-		for (int i =0; i < num_of_nodes; i++) {
-			for (int j =0; j < num_of_nodes; j++) {
-				for (int k =0; k < num_of_nodes; i++) {
+		count = 0;
+		for (int i=0; i < M; i++) {
+			for (int j=0; j < N; j++) {
+				for (int k=0; k < N; k++) {
 					//relaxation logic applied here...
 					if (ft[i].dist[j] > new_cost_matrix[i][k] + ft[k].dist[j]) {
 						
+						printf ("\n\ni=%d, j=%d, k=%d ",i,j,k);
+
+						printf ("\nft[i].dist[j] : %d ",ft[i].dist[j]);
+						printf ("\nnew_cost_matrix[i][k] : %d ",new_cost_matrix[i][k]);
+						printf ("\nft[k].dist[j] : %d ",ft[k].dist[j]);
+
 						ft[i].dist[j] = ft[i].dist[k] + ft[k].dist[j];
-						ft[i].next[j] = k;
+						ft[i].from[j] = k;
 						count++;
 					}
-				}
+				}				
 			}
 		}
 	} while (count != 0);
 
-	for (int i =0; i < num_of_nodes; i++) {
-		printf("\n\nState value for router %d is \n",i);
-		for (int j =0; j < num_of_nodes; j++) {
-			printf("\t\nnode %d via %d Distance %d",j, ft[i].next[j], ft[i].dist[j]);
+	for (int i =0; i < M; i++) {
+		for (int j =0; j < N; j++) {
+			if (ft[i].dist[j] > 0) {
+				printf("\nnode %d via %d distance %d",i,j,ft[i].dist[j]);
+			}
 		}
 	}
 }
@@ -223,23 +236,7 @@ void listenForNeighbors()
 	char logLine[1024] = {};
 	FILE *theLogFile = fopen(theLogFileName, "w+");
 
-	printf("\ninside listen for neighbour");
-	struct fw_table *ft = {0};
-	printf("\n ft1 ...");
-	memset(&ft, 0, sizeof(ft) * 256);
-	printf("\n ft2 ...");
-	ft = (struct fw_table*) malloc (sizeof(struct fw_table));
-	printf("\n ft3 ...");
-	memset(&ft->dist, 0, sizeof(ft->dist));
-	printf("\n ft4 ...");
-	memset(&ft->next, 0, sizeof(ft->next));
-	printf("\n ft5 ...");
-
-	if (ft != NULL) {
-		calculateDistanceVector(M, cost_matrix,&ft);
-	} else {
-		printf("\nfw table is null");
-	}
+	calculateDistanceVector(intialNodeSize, cost_matrix);	
 	
 	int bytesRecvd;
 	while(1)
@@ -265,11 +262,14 @@ void listenForNeighbors()
 		int arr[M];
 		int nearest_neig_cost = -1;
 
-		int cost = ft[dest_node].dist[globalMyID];
-		int nextHop = ft[dest_node].next[globalMyID];
-		//int cost = 0;
-		//int nextHop = 0;
+		int cost = ft[globalMyID].dist[dest_node];
+		int nextHop = ft[globalMyID].from[dest_node];
 
+		if (cost ==0) {
+			cost = cost_matrix[globalMyID][dest_node];
+			nextHop = dest_node;
+		}
+		
 		printf("cost from %d to %d seems to be : %d\n",globalMyID,nextHop,cost);
 		
 		short int heardFrom = -1;
@@ -305,7 +305,6 @@ void listenForNeighbors()
 				
 				sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",dest_node,nextHop,message);
 				logToFile(theLogFileName,logLine);
-				printf("\n%s\n", logLine);
 				sendOrForwardToDestination(dest_node, message);
 				
 			}
@@ -319,6 +318,7 @@ void listenForNeighbors()
 			// ...
 			sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",dest_node,nextHop,recvBuf+6);
 			logToFile(theLogFileName,logLine);
+			sendOrForwardToDestination(dest_node, message);
 		}
 			
 		//do other changes here");
