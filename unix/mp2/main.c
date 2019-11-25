@@ -11,6 +11,7 @@ char *theLogFileName;
 int cost_matrix[M][N];
 
 int intialNodeSize = 0;
+int* node_arr;
 int globalMyID = 0;
 //last time you heard from each node. TODO: you will want to monitor this
 //in order to realize when a neighbor has gotten cut off from you.
@@ -57,13 +58,20 @@ int main(int argc, char** argv)
 	}
 
 	//initialize 255 * 255 table matrix.
-	for (int i =0; i < M+1 ; i++) {
-		for (int j =0; j < N+1 ; j++) {
-			cost_matrix[i][j] = 0;			
+	for (int i =0; i < M ; i++) {
+		for (int j =0; j < N ; j++) {
+			cost_matrix[i][i] = 0;
+			cost_matrix[i][j] = 1000; //max value
 		}
 	}
-	
+
 	char line[128];
+	
+	node_arr = (int*)malloc (N * sizeof(int));
+	
+	node_arr[intialNodeSize] = globalMyID;
+	//printf ("\ntrue value at node %d is %d ", intialNodeSize, node_arr[intialNodeSize]);
+	intialNodeSize = intialNodeSize +1;
 
 	while (fgets(line, sizeof line, file) != NULL) {
 		
@@ -88,9 +96,14 @@ int main(int argc, char** argv)
 			token = strtok(NULL, "-");
 		}
 		
-		cost_matrix[globalMyID][nodeid] = cost;
-		cost_matrix[nodeid][globalMyID] = cost;
-		intialNodeSize++;
+		if (globalMyID != nodeid) {
+			cost_matrix[globalMyID][nodeid] = cost;
+			cost_matrix[nodeid][globalMyID] = cost;
+		
+			node_arr[intialNodeSize] = nodeid;
+			printf ("\n true value at node %d is %d ", intialNodeSize, node_arr[intialNodeSize]);
+			intialNodeSize = intialNodeSize +1;
+		}		
 	}
 
 	fclose(file);
@@ -121,6 +134,7 @@ int main(int argc, char** argv)
 	pthread_t announcerThread;
 	pthread_create(&announcerThread, 0, announceToNeighbors, (void*)0);
 	
+
 	//good luck, have fun!
 	listenForNeighbors();
 	
