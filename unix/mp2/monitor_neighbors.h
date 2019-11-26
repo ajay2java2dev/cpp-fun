@@ -15,7 +15,6 @@
 
 #define M 256
 #define N 256
-#define BLOCK 256
 
 //forwarding / routing table to be constructed for each node
 struct fw_table {
@@ -25,9 +24,10 @@ struct fw_table {
 
 extern int cost_matrix[M][N];
 
-extern char *theLogFileName;
-extern int intialNodeSize;
-extern int *node_arr;
+extern char *log_file_name;
+
+extern int node_size;
+extern int *node_list;
 
 extern int globalMyID;
 //last time you heard from each node. TODO: you will want to monitor this
@@ -91,99 +91,57 @@ void printGraph(int graph[M][N]) {
 	}
 }
 
-void calculateEfficientDistanceVector (int new_cost_matrix[M][N]) {
-
-	if (new_cost_matrix != NULL) {
-		for (int i = 0; i < sizeof(node_arr) ; i++) {
-			
-			int node_from = node_arr[i];
-
-			for (int j = 0; j < sizeof(node_arr) ; j++) {
-				if (i != j) {
-					int node_to = node_arr[j];
-
-					ft[i].dist[j] = new_cost_matrix[node_from][node_to];
-					ft[i].from[j] = j;
-
-					//printf ("\ncost from %d to %d is : %d", node_from, node_to, ft[i].dist[j]);
-					//printf("\nDestination : %d, Distance %d, Next %d",i, ft[i].dist[j], ft[i].from[j]);
-				}
-			}
+void constructNetworkTopology(int cost_matrix[M][N]) {
+	for (int i = 0; i < M; i++) {
+		for (int j =0; j < N; j++) {
+			ft[i].dist[j] = cost_matrix[i][j];
+			ft[i].from[j] = j;
 		}
+	}
+}
 
-		//exit(1);
-		int count = 0;
+void calculateEfficientDistanceVector (int num_nodes, int cost_matrix[M][N]) {
+
+	if (cost_matrix != NULL) {
+		int count;
 
 		do {
 			count = 0;
-			for (int i=0; i < sizeof(node_arr); i++) {
-				for (int j=0; j < sizeof(node_arr); j++) {
-					for (int k=0; k < sizeof(node_arr); k++) {
-						//relaxation logic applied here...
-						int node_from = node_arr[i];
-						int node_to = node_arr[k];
-						int new_cost = new_cost_matrix[node_from][node_to];
-						printf ("\ncost from %d to %d is : %d", node_from, node_to, new_cost);
+			for (int i =0; i < num_nodes; i++) {
+				int i_node = node_list[i];
+				for (int j = 0; j < num_nodes; j++) {
+					int j_node = node_list[j];
+					for (int k = 0; k < num_nodes; k++) {
+						int k_node = node_list[k];
 
-						if (ft[i].dist[j] > new_cost + ft[k].dist[j]) {
-							ft[i].dist[j] = ft[i].dist[k] + ft[k].dist[j];
-							ft[i].from[j] = k;
+						if (ft[i_node].dist[j_node] > cost_matrix[i_node][k_node] + ft[k_node].dist[j_node]) {
+							
+							// printf("\n #--------------------------#");
+							// printf("\ni : %d, j : %d, k : %d", i, j, k);
+							// printf("\ni_node : %d, j_node : %d, k_node : %d", i_node, j_node, k_node);
+							// printf("\nft[i_node].dist[j_node]: %d", ft[i_node].dist[j_node]);
+							// printf("\ncost_matrix[i_node][k_node]: %d", cost_matrix[i_node][k_node]);
+							// printf("\nft[k_node].dist[j_node]: %d", ft[k_node].dist[j_node]);
+							// printf("\n #--------------------------#");
+
+							ft[i_node].dist[j_node] = ft[i_node].dist[k_node] + ft[k_node].dist[j_node];
+							ft[i_node].dist[j_node] = k_node;
 							count++;
 						}
-					}				
+					}
 				}
 			}
-		} while (count != 0 && count < 2);
+		} while (count != 0);
 
 	}
 }
 
-void calculateDistanceVector (int num_of_nodes, int new_cost_matrix[M][N]) {
-
-	int count =0;
-
-	//printf("\nprinting new cost matrix ... num of nodes %d", num_of_nodes);
-	
-	for (int i =0;i < M; i++){
-		for (int j =0; j < N; j++) {
-			ft[i].dist[j] = new_cost_matrix[i][j];
-			ft[i].from[j] = j;
-			//printf("\ndistance from %d to %d is : %d",i,j,ft[i].dist[j]);
-		}
-	}
-
-	do {
-		count = 0;
-		for (int i=0; i < M; i++) {
-			for (int j=0; j < N; j++) {
-				for (int k=0; k < N; k++) {
-
-					printf ("\n\ni=%d, j=%d, k=%d ",i,j,k);
-					printf ("\nft[i].dist[j] : %d ",ft[i].dist[j]);
-					printf ("\nnew_cost_matrix[i][k] : %d ",new_cost_matrix[i][k]);
-					printf ("\nft[k].dist[j] : %d ",ft[k].dist[j]);
-
-					//relaxation logic applied here...
-					if (ft[i].dist[j] > new_cost_matrix[i][k] + ft[k].dist[j]) {
-						ft[i].dist[j] = ft[i].dist[k] + ft[k].dist[j];
-						ft[i].from[j] = k;
-						count++;
-
-						printf ("\nnew ft[i].dist[j] : %d ",ft[i].dist[j]);						
-					}
-				}				
-			}
-		}
-	} while (count != 0 && count < 2);
-
-	for (int i =0; i < M; i++) {
-		for (int j =0; j < N; j++) {
-			if (ft[i].dist[j] > 0 && ft[i].dist[j] < 1000) {
-				printf("\nDestination : %d, Distance %d, Next %d",i, ft[i].dist[j], ft[i].from[j]);
-			}
-		}
-	}
+void* invokeDVCalculation(void* unusedParam) {
+	calculateEfficientDistanceVector (node_size, cost_matrix);
 }
+
+
+
 /*
 int minimumDistance (int dist[], bool sptSet[]) {
 	int min = INT8_MAX, min_index;
@@ -275,12 +233,13 @@ void listenForNeighbors()
 	unsigned char recvBuf[1000];
 	
 	char logLine[1024] = {};
-	FILE *theLogFile = fopen(theLogFileName, "w+");
+	FILE *theLogFile = fopen(log_file_name, "w+");
 
-	//calculateDistanceVector(intialNodeSize, cost_matrix);
-	calculateEfficientDistanceVector(cost_matrix);
-	
 	int bytesRecvd;
+
+	printf("\n\nYeahhh..... Ready for listening .....");
+	printf("\n\nYeahhh..... Ready for listening .....");
+
 	while(1)
 	{
 		theirAddrLen = sizeof(theirAddr);
@@ -297,21 +256,16 @@ void listenForNeighbors()
 				
 		//unsigned short int le_value = (recvBuf+4)[0] + ((recvBuf+4)[1] << 8); //little_endian value
 		unsigned short int dest_node = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8); //big_endian value
+		printf("\n\nRequesting packet to destination : %d",dest_node);
+		
 		char * message = recvBuf+6;
-
-		int exact_dest_node = node_arr[dest_node];
-		printf("\n\nexact dest node : %d",dest_node);
-
-		int cost = ft[0].dist[exact_dest_node];
-		int nextHop = ft[0].from[exact_dest_node];
-
-		if (cost ==0) {
-			cost = cost_matrix[globalMyID][dest_node];
-			nextHop = dest_node;
-		}
+		
+		int cost = ft[globalMyID].dist[dest_node];
+		int nextHop = ft[globalMyID].from[dest_node];
 
 		printf("\n%s heard from %s, dest_node : %d, msg recvd: %s",recvBuf,fromAddr,dest_node,message);
 		printf("\ncost from %d to %d seems to be : %d",globalMyID,nextHop,cost);
+		printf("\n......");
 		
 		short int heardFrom = -1;
 		if(strstr(fromAddr, "10.1.1."))
@@ -321,11 +275,11 @@ void listenForNeighbors()
 			//TODO: this node can consider heardFrom to be directly connected to it; 
 			//do any such logic now.	
 			//record that we heard from heardFrom just now.
-			sprintf(logLine,"\nheard from %d just now",heardFrom);
-			logToFile(theLogFileName,logLine);
+			sprintf(logLine,"heard from %d just now\n",heardFrom);
+			logToFile(log_file_name,logLine);
 			if (globalMyID == dest_node) {
-				sprintf(logLine, "\neceive packet message %s", message);
-				logToFile(theLogFileName,logLine);
+				sprintf(logLine, "receive packet message %s\n", message);
+				logToFile(log_file_name,logLine);
 			}
 			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
 		}
@@ -336,18 +290,18 @@ void listenForNeighbors()
 		{
 			//TODO send the requested message to the requested destination node
 			// ... 
-			if (cost == 1000) {
+			if (cost >= INT16_MAX) {
 				
-				sprintf(logLine, "\nunreachable dest %d",dest_node);
-				logToFile(theLogFileName,logLine);
+				sprintf(logLine, "unreachable dest %d\n",dest_node);
+				logToFile(log_file_name,logLine);
 
 			} else if (nextHop == dest_node) {
-				sprintf(logLine, "\nsending packet dest %d nexthop %d message %s",dest_node,nextHop,message);
-				logToFile(theLogFileName,logLine);
+				sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",dest_node,nextHop,message);
+				logToFile(log_file_name,logLine);
 				sendOrForwardToDestination(dest_node, message);
 			} else {
-				sprintf(logLine, "\nforward packet dest %d nexthop %d message %s",dest_node,nextHop,message);
-				logToFile(theLogFileName,logLine);
+				sprintf(logLine, "forward packet dest %d nexthop %d message %s\n",dest_node,nextHop,message);
+				logToFile(log_file_name,logLine);
 				sendOrForwardToDestination(dest_node, message);
 			}
 		}
@@ -364,14 +318,13 @@ void listenForNeighbors()
 			cost_matrix[globalMyID][dest_node] = new_cost;
 
 			if (nextHop == dest_node) {
-				calculateDistanceVector(intialNodeSize, cost_matrix);
+				calculateEfficientDistanceVector(node_size, cost_matrix);
 			} else  {				
 				sendOrForwardToDestination(dest_node, message);
 			}
 
-			sprintf(logLine, "\nnew cost to dest %d is %s",dest_node,message);
-			printf("%s",logLine);
-			//logToFile(theLogFileName,logLine);			
+			sprintf(logLine, "\nnew cost to dest %d is %s\n",dest_node,message);
+			printf("%s",logLine);			
 		}
 			
 		//do other changes here");
