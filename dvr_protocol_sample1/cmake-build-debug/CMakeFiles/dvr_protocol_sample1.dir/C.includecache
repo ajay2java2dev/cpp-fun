@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-/cygdrive/c/Users/amenon4/source/samples/mygithub/cpp-fun/dvr_protocol_sample1/main.c
+/Users/ajay/cpp-fun/dvr_protocol_sample1/main.c
 stdio.h
 -
 stdlib.h

@@ -44,48 +44,46 @@ int *node_list;
 
 
 //lets modify the topology
-void calculateDistanceVector(int cost_matrix[M][N]) {
+void calculateDistanceVector(int num_nodes, int cost_matrix[M][N]) {
 
     int count = 0;
     do {
-        for (int i = 0; i < M; i++) {
+        for (int i = 0; i < num_nodes; i++) {
+            int i_node = node_list [i];
+            for (int j =0; j < num_nodes; j++) {
+                int j_node = node_list [j];
+                for (int k = 0; k < num_nodes; k++) {
+                    int k_node = node_list [k];
 
-            if (node_list[i] == -1) {
-                continue;
-            }
-            printf ("\n\ti  ---->> >> >>> %d" , node_list[i]);
-
-            for (int j =0; j < N; j++) {
-
-                if (node_list[j] == -1) {
-                    continue;
-                }
-                printf ("\n\t\tj  ---->> >> >>> %d" , node_list[j]);
-
-                for (int k = 0; k < N; k++) {
-
-                    if (node_list[k] == -1) {
-                        continue;
-                    }
-                    printf ("\n\t\t\tk  ---->> >> >>> %d" , node_list[k]);
-
-                    if (rt_full[i].dist[j] > cost_matrix[i][k] + rt_full[k].dist[j]) {
+                    if (rt_full[i_node].dist[j_node] > cost_matrix[i_node][k_node] + rt_full[k_node].dist[j_node]) {
 
                         printf("\n##################");
-                        printf("\nrt_full[i].dist[j]  == %d", rt_full[i].dist[j]);
-                        printf("\ncost_matrix[i][k]  == %d", cost_matrix[i][k]);
-                        printf("\nrt_full[k].dist[j]  == %d", rt_full[k].dist[j]);
+                        printf("\ncount = %d",count);
+                        printf("\nrt_full[i].dist[j]  == %d", rt_full[i_node].dist[j_node]);
+                        printf("\ncost_matrix[i][k]  == %d", cost_matrix[i_node][k_node]);
+                        printf("\nrt_full[k].dist[j]  == %d", rt_full[k_node].dist[j_node]);
                         printf("\n##################");
 
-                        rt_full[i].dist[j] = rt_full[i].dist[k] + rt_full[k].dist[j];
-                        rt_full[i].from[j] = k;
+                        rt_full[i_node].dist[j_node] = rt_full[i_node].dist[k_node] + rt_full[k_node].dist[j_node];
+                        rt_full[i_node].from[j_node] = k_node;
                         count ++;
 
                     }
                 }
             }
         }
-    } while (count != 0);
+    } while (count <= 1);
+
+    for (int i = 0; i < num_nodes ; i++) {
+        for (int j = 0; j < num_nodes; j++) {
+
+            int i_node = node_list [i];
+            int j_node = node_list [j];
+
+            printf("\n%d = %d --> rt_full[i].dist[j]  == %d, rt_full[i_node].dist[j_node] =%d",i_node,j_node,
+                    rt_full[i_node].dist[j_node],rt_full[i_node].from[j_node]);
+        }
+    }
 
 }
 
@@ -113,7 +111,7 @@ int main() {
 
     int cost_matrix[M][N];
     int num_nodes = 3;
-    node_list = (int*) malloc(255 * sizeof (int*));
+    node_list = (int*) malloc(sizeof (int*));
 
     for (int i = 0; i < M; i++) {
 
@@ -131,10 +129,16 @@ int main() {
     cost_matrix[1][2] = 50;
     cost_matrix[2][0] = 20;
     cost_matrix[2][1] = 50;
+    cost_matrix[250][1] = 10;
+    cost_matrix[1][250] = 10;
+    cost_matrix[200][250] = 15;
+    cost_matrix[250][200] = 15;
     node_list[0]=0;
     node_list[1]=1;
     node_list[2]=2;
+    node_list[3]=250;
+    node_list[4]=200;
 
     constructTopologyNetwork(cost_matrix); // 255 * 255 topology
-    calculateDistanceVector(cost_matrix);
+    calculateDistanceVector(5,cost_matrix);
 }

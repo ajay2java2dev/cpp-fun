@@ -1,1 +1,1 @@
-/usr/bin/cc -g  -Wl,--enable-auto-import CMakeFiles/dvr_protocol_sample1.dir/main.c.o  -o dvr_protocol_sample1.exe -Wl,--out-implib,libdvr_protocol_sample1.dll.a -Wl,--major-image-version,0,--minor-image-version,0 
+/Library/Developer/CommandLineTools/usr/bin/cc -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/dvr_protocol_sample1.dir/main.c.o  -o dvr_protocol_sample1 

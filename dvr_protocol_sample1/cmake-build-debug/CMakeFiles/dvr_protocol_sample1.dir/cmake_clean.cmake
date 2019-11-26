@@ -1,8 +1,7 @@
 file(REMOVE_RECURSE
   "CMakeFiles/dvr_protocol_sample1.dir/main.c.o"
-  "dvr_protocol_sample1.exe"
+  "dvr_protocol_sample1"
   "dvr_protocol_sample1.pdb"
-  "libdvr_protocol_sample1.dll.a"
 )
 
 # Per-language clean rules from dependency scanning.
