@@ -48,9 +48,9 @@ void hackyBroadcast(const char* buf, int length)
 	for(i=0;i<256;i++){
 		 //(although with a real broadcast you would also get the packet yourself)
 		if(i != globalMyID) {
-			//printf("\ninside hacky %i: global id: %d",i,globalMyID);
-			sendto(globalSocketUDP, buf, length, 0,
+			int num_bytes_sent = sendto(globalSocketUDP, buf, length, 0,
 				  (struct sockaddr*)&globalNodeAddrs[i], sizeof(globalNodeAddrs[i]));
+			//printf("\ninside hacky %i: global id: %d, buf : %d",i,globalMyID, num_bytes_sent);
 		}
 	}
 }
@@ -71,6 +71,8 @@ void logToFile(char *theLogFileName, char *logLine) {
 	if (theLogFileName != NULL) {
 		FILE *theLogFile = fopen(theLogFileName, "a");
 		fprintf(theLogFile, "%s",logLine);
+		
+		printf("%s",logLine);
 		fclose(theLogFile);
 	} else {
 		printf("Unable to print to file. The log file name is null ...");
@@ -88,6 +90,18 @@ void printGraph(int graph[M][N]) {
 			}			
 		}
 		printf("\n################################\n");
+	}
+}
+
+void printCostMatrix() {
+	for (int i = 0; i < M; i++) {
+		for (int j = 0; j < M; j++) {
+			if (cost_matrix[i][j] > 0 
+				&& cost_matrix[i][j] < INT16_MAX) {
+					printf("\n cost %d to %d is .. %d"
+						,i,j,cost_matrix[i][j]);
+				}
+		}
 	}
 }
 
@@ -113,17 +127,17 @@ void calculateEfficientDistanceVector (int num_nodes, int cost_matrix[M][N]) {
 					int j_node = node_list[j];
 					for (int k = 0; k < num_nodes; k++) {
 						int k_node = node_list[k];
-
+						
 						if (ft[i_node].dist[j_node] > cost_matrix[i_node][k_node] + ft[k_node].dist[j_node]) {
 							
-							// printf("\n #--------------------------#");
-							// printf("\ni : %d, j : %d, k : %d", i, j, k);
-							// printf("\ni_node : %d, j_node : %d, k_node : %d", i_node, j_node, k_node);
-							// printf("\nft[i_node].dist[j_node]: %d", ft[i_node].dist[j_node]);
-							// printf("\ncost_matrix[i_node][k_node]: %d", cost_matrix[i_node][k_node]);
-							// printf("\nft[k_node].dist[j_node]: %d", ft[k_node].dist[j_node]);
-							// printf("\n #--------------------------#");
-
+							printf("\n #--------------------------#");
+							printf("\ni : %d, j : %d, k : %d", i, j, k);
+							printf("\ni_node : %d, j_node : %d, k_node : %d", i_node, j_node, k_node);
+							printf("\nft[i_node].dist[j_node]: %d", ft[i_node].dist[j_node]);
+							printf("\ncost_matrix[i_node][k_node]: %d", cost_matrix[i_node][k_node]);
+							printf("\nft[k_node].dist[j_node]: %d", ft[k_node].dist[j_node]);
+							printf("\n #--------------------------#");
+							
 							ft[i_node].dist[j_node] = ft[i_node].dist[k_node] + ft[k_node].dist[j_node];
 							ft[i_node].dist[j_node] = k_node;
 							count++;
@@ -133,6 +147,7 @@ void calculateEfficientDistanceVector (int num_nodes, int cost_matrix[M][N]) {
 			}
 		} while (count != 0);
 
+		printf("\nnumber of nodes processed : %d",num_nodes);
 	}
 }
 
@@ -140,57 +155,53 @@ void* invokeDVCalculation(void* unusedParam) {
 	calculateEfficientDistanceVector (node_size, cost_matrix);
 }
 
+int sndToDest(int src_node, int dest_node, char *command, char *message) {
+	short int destID = dest_node;
+	short int no_destID = htons(destID);
 
+	printf("\n\nDESTINATION ID : %d",destID);
+	printf("\nNO_DEST ID : %d",no_destID);
+	printf("\nCOMMAND :%s\n\n",command);
 
-/*
-int minimumDistance (int dist[], bool sptSet[]) {
-	int min = INT8_MAX, min_index;
+	int senderSocket = socket(AF_INET, SOCK_DGRAM, 0);
+	if(senderSocket < 0)
+		perror("socket()");
+	
+	struct sockaddr_in srcAddr;
+	char tempaddr1[100];
+	sprintf(tempaddr1, "10.1.1.%d", src_node);
+	memset(&srcAddr, 0, sizeof(srcAddr));
+	srcAddr.sin_family = AF_INET;
+	srcAddr.sin_port = htons(8999);
+	inet_pton(AF_INET, tempaddr1, &srcAddr.sin_addr);
+	if(bind(senderSocket, (struct sockaddr*)&srcAddr, sizeof(srcAddr)) < 0)
+		perror("bind()");
+	
+	struct sockaddr_in destAddr;
+	char tempaddr[100];
+	sprintf(tempaddr, "10.1.1.%d", dest_node);
+	memset(&destAddr, 0, sizeof(destAddr));
+	destAddr.sin_family = AF_INET;
+	destAddr.sin_port = htons(7777);
+	inet_pton(AF_INET, tempaddr, &destAddr.sin_addr);
+	
+	int msgLen = 4+sizeof(short int)+strlen(message);
+	char* sendBuf = malloc(msgLen);
 
-	for (int node = 0; node < M; node++) {
-		if (sptSet[node] == false && dist[node] <= min) {
-			min = dist[node], min_index = node;			
-		}
-	}
-	//printf("\nreturning minimum index : %d and min value %d", min_index, min);
-	return min_index;
+	strcpy(sendBuf, command);
+	memcpy(sendBuf+4, &no_destID, sizeof(short int));
+	memcpy(sendBuf+4+sizeof(short int), message, strlen(message));
+
+	if(sendto(senderSocket, sendBuf, msgLen, 0, (struct sockaddr*)&destAddr, sizeof(destAddr)) < 0)
+		perror("sendto()");
+	free(sendBuf);
+
+	
+	close(senderSocket);
+
 }
 
-//single source shorted path algorithm
-void calculateShortestPathForAllNodes(int graph[M][N], int src, int *dist) {
-	
-	//removed dist from local param to pass a param due to memory constraints.
-	//int dist[M]; //to hold the shortest distance from src to node/vertex i.
-	
-	bool sptSet[M]; //node/vertex i will be true if node is included in shortest path
-
-	for (int i = 0; i < M; i++) {
-		dist[i] = INT32_MAX, sptSet[i] = false; //resetting out temp array
-	}
-
-	dist[src] = 0; //distance of the global node to itself is 0;
-
-	//relaxation for all nodes
-	for (int count = 0; count < M-1; count++) {
-		int u = minimumDistance(dist, sptSet);
-		
-		sptSet[u] = true;
-
-		for (int v = 0; v < M; v++) {
-			if (!sptSet[v] && graph[u][v] && dist[u] != INT32_MAX
-				&& dist[u] + graph[u][v] < dist[v]) {
-				dist[v] = dist[u] + graph[u][v];
-			}
-		}
-	}
-
-
-	printf("Vertex \t\t Distance from Source \n");
-	for (int i =0; i < M; i++)
-		printf("%d \t\t %d\n",i,dist[i]);	
-}
-*/
-
-void sendOrForwardToDestination (int dest_node, char *message) {
+int sendOrForwardToDestination (int dest_node, char *message) {
 	int numbytes;
 	int sockfd;
 	int broadcast = 1;
@@ -213,7 +224,6 @@ void sendOrForwardToDestination (int dest_node, char *message) {
 
 	memset(&theirAddr, 0, sizeof(theirAddr));
 	
-	//FIXME: Do we need to set the broadcast settings ... 
 	their_addr.sin_family = AF_INET;
 	their_addr.sin_port = htons(7777);
 	inet_pton(AF_INET, theirAddr, &their_addr.sin_addr);
@@ -223,6 +233,47 @@ void sendOrForwardToDestination (int dest_node, char *message) {
 		perror("sendto");
 		exit(1);
 	}
+
+	return numbytes;
+}
+
+int findNextHop(int src_node, int dest_node) {
+	int next_hop = -1;
+	int prev_idx = -1;
+	int prev_cost = INT32_MAX;
+
+	for (int i =0; i< sizeof(ft[src_node]); i++) {
+		
+		int tmp_cost = ft[globalMyID].dist[i];
+		int tmp_next_hop = ft[globalMyID].from[i];
+
+		if (globalMyID != i && tmp_cost >= 0 
+				&& tmp_cost <= 1000 && tmp_next_hop <= 255) {
+			printf("\nnext hops available from %d are %d with cost %d", 
+				globalMyID, tmp_next_hop, tmp_cost);
+			
+			if (next_hop != -1) {
+				//this means next hop already set... do tie breaker
+				if (prev_cost > tmp_cost) {
+					next_hop = tmp_next_hop;
+					prev_idx = i;
+					prev_cost = tmp_cost;
+				} else if (prev_cost == tmp_cost) {
+					if (tmp_next_hop < next_hop) {
+						next_hop = tmp_next_hop;
+						prev_idx = i;
+						prev_cost = tmp_cost;
+					}
+				}
+			} else {
+				next_hop = tmp_next_hop;
+				prev_idx = i;
+				prev_cost = tmp_cost;
+			}
+		}
+	}
+
+	return next_hop;
 }
 
 void listenForNeighbors()
@@ -236,12 +287,10 @@ void listenForNeighbors()
 	FILE *theLogFile = fopen(log_file_name, "w+");
 
 	int bytesRecvd;
-
-	printf("\n\nYeahhh..... Ready for listening .....");
-	printf("\n\nYeahhh..... Ready for listening .....");
+	printf("\nlistener waiting for packet to arrive...");
 
 	while(1)
-	{
+	{	
 		theirAddrLen = sizeof(theirAddr);
 		if ((bytesRecvd = recvfrom(globalSocketUDP, recvBuf, 1000 , 0, 
 					(struct sockaddr*)&theirAddr, &theirAddrLen)) == -1)
@@ -253,34 +302,31 @@ void listenForNeighbors()
 		inet_ntop(AF_INET, &theirAddr.sin_addr, fromAddr, 100);
 
 		recvBuf[bytesRecvd] = '\0';
-				
-		//unsigned short int le_value = (recvBuf+4)[0] + ((recvBuf+4)[1] << 8); //little_endian value
-		unsigned short int dest_node = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8); //big_endian value
-		printf("\n\nRequesting packet to destination : %d",dest_node);
-		
-		char * message = recvBuf+6;
-		
-		int cost = ft[globalMyID].dist[dest_node];
-		int nextHop = ft[globalMyID].from[dest_node];
 
-		printf("\n%s heard from %s, dest_node : %d, msg recvd: %s",recvBuf,fromAddr,dest_node,message);
-		printf("\ncost from %d to %d seems to be : %d",globalMyID,nextHop,cost);
-		printf("\n......");
+		printf("\nheard from %s  and strstr(fromAddr, \"10.1.1.\") is = %s"
+			,fromAddr, strstr(fromAddr, "10.1.1."));
 		
 		short int heardFrom = -1;
 		if(strstr(fromAddr, "10.1.1."))
 		{
 			heardFrom = atoi(strchr(strchr(strchr(fromAddr,'.')+1,'.')+1,'.')+1);
 			
-			//TODO: this node can consider heardFrom to be directly connected to it; 
-			//do any such logic now.	
-			//record that we heard from heardFrom just now.
-			sprintf(logLine,"heard from %d just now\n",heardFrom);
-			logToFile(log_file_name,logLine);
-			if (globalMyID == dest_node) {
-				sprintf(logLine, "receive packet message %s\n", message);
-				logToFile(log_file_name,logLine);
+			//TODO: this node can consider heardFrom to be directly connected to it; do any such logic now.	
+			if (globalMyID != heardFrom 
+					&& cost_matrix[globalMyID][heardFrom] == INT16_MAX) {
+				cost_matrix[globalMyID][heardFrom] = 1;
+				cost_matrix[heardFrom][globalMyID] = 1;
+				node_list[node_size] = heardFrom;
+				node_size = node_size + 1;
+				
+				constructNetworkTopology(cost_matrix);
+				calculateEfficientDistanceVector(node_size, cost_matrix);
 			}
+			//record that we heard from heardFrom just now.
+			
+			sprintf(logLine,"\nheard from %d just now\n",heardFrom);
+			printf("%s",logLine);
+
 			gettimeofday(&globalLastHeartbeat[heardFrom], 0);
 		}
 		
@@ -290,19 +336,32 @@ void listenForNeighbors()
 		{
 			//TODO send the requested message to the requested destination node
 			// ... 
-			if (cost >= INT16_MAX) {
-				
-				sprintf(logLine, "unreachable dest %d\n",dest_node);
-				logToFile(log_file_name,logLine);
+			unsigned int dest_node = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8); //big_endian value
+			char * message = recvBuf+4+sizeof(short int);
 
-			} else if (nextHop == dest_node) {
+			printf("\nCOMMAND \"%s\" heard from %s, dest_node : %d, msg recvd: %s",recvBuf,fromAddr,dest_node,message);
+
+			int nextHop = ft[globalMyID].dist[dest_node];
+			printf("\nPFWD MSG ... next hop %d",nextHop);
+
+			if (nextHop < 0 || nextHop > 255) {
+				nextHop  = findNextHop(globalMyID, dest_node);
+				short int no_destID = htons(nextHop);
+			}			
+			
+			int cost = ft[globalMyID].dist[nextHop];			
+						
+			printf("\nFINAL cost from %d to next hop %d  is : %d",globalMyID,nextHop,cost);
+			printf("\n......\n");
+
+			int sent_bytes = -1;
+			if (cost > 0 && cost < 1000) {
 				sprintf(logLine, "sending packet dest %d nexthop %d message %s\n",dest_node,nextHop,message);
 				logToFile(log_file_name,logLine);
-				sendOrForwardToDestination(dest_node, message);
-			} else {
-				sprintf(logLine, "forward packet dest %d nexthop %d message %s\n",dest_node,nextHop,message);
-				logToFile(log_file_name,logLine);
-				sendOrForwardToDestination(dest_node, message);
+				
+				sent_bytes = sendOrForwardToDestination(nextHop, message);
+				//sndToDest(globalMyID, dest_node, "pfwd", message);
+				printf("\nsent %s to next_hop %d", message, nextHop);
 			}
 		}
 		//'cost'<4 ASCII bytes>, destID<net order 2 byte signed> newCost<net order 4 byte signed>
@@ -312,19 +371,70 @@ void listenForNeighbors()
 			//in that case,
 			//this is the new cost you should treat it as having once it comes back up.)
 			// ...
+			//unsigned short int le_value = (recvBuf+4+sizeof(int))[0] + ((recvBuf+4+sizeof(short int))[1] << 8);
+			unsigned int dest_node = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8); //big_endian value
+			unsigned int new_cost = (recvBuf+4+sizeof(int))[1] + ((recvBuf+4+sizeof(short int))[0] << 8);
+
+			sprintf(logLine, "\nnew cost from %d to %d is %d",globalMyID, dest_node, new_cost);
 			
-			int new_cost = 0;
-			sscanf(message, "%d", &new_cost);
 			cost_matrix[globalMyID][dest_node] = new_cost;
+			cost_matrix[dest_node][globalMyID] = new_cost;
+			constructNetworkTopology(cost_matrix);
+			calculateEfficientDistanceVector(node_size, cost_matrix);
+			printCostMatrix();
 
-			if (nextHop == dest_node) {
-				calculateEfficientDistanceVector(node_size, cost_matrix);
-			} else  {				
-				sendOrForwardToDestination(dest_node, message);
+		} else if(!strncmp(recvBuf, "pfwd", 4)) {
+			
+			unsigned int dest_node = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8); //big_endian value
+			
+			char * message = recvBuf+4+sizeof(short int);
+
+			printf("\nPFWD MSG ...COMMAND \"%s\" heard from %s, dest_node : %d, msg recvd: %s"
+				,recvBuf,fromAddr,dest_node,message);
+
+			int nextHop = ft[globalMyID].dist[dest_node];
+			printf("\nPFWD MSG ... next hop %d",nextHop);
+
+			if (nextHop < 0 || nextHop > 255) {
+				nextHop = ft[globalMyID].dist[nextHop];
+				printf("\nPFWD MSG ... NEW next hop %d",nextHop);
+			}					
+			int cost = ft[globalMyID].dist[nextHop];
+			
+			printf("\nPFWD MSG ...FINAL cost from %d to next hop %d  is : %d"
+					,globalMyID,nextHop,cost);
+			printf("\n......\n");
+
+			int sent_bytes = -1;
+
+			if (cost > 1000) {
+				
+				sprintf(logLine, "unreachable dest %d\n",nextHop);
+				logToFile(log_file_name,logLine);
+			
+			} else {
+				if (cost > 0 && cost < 1000) {
+
+					sprintf(logLine, "forward packet dest %d nexthop %d message %s\n",dest_node,nextHop,message);
+					logToFile(log_file_name,logLine);
+					
+					if (dest_node == nextHop) {
+						sent_bytes = sndToDest(globalMyID, dest_node, "rcvd", message);
+					} else {
+						sent_bytes = sndToDest(globalMyID, dest_node, "pfwd", message);
+					}
+				}
 			}
+			
+		
+		} else if(!strncmp(recvBuf, "rcvd", 4)) {
 
-			sprintf(logLine, "\nnew cost to dest %d is %s\n",dest_node,message);
-			printf("%s",logLine);			
+			unsigned int dest_node = (recvBuf+4)[1] + ((recvBuf+4)[0] << 8); //big_endian value
+			char * message = recvBuf+4+sizeof(short int);
+
+			printf("\nRCVD MSG ... %s heard from %s, dest_node : %d, msg recvd: %s",recvBuf,fromAddr,dest_node,message);
+			sprintf(logLine, "receive packet message %s\n",message);
+			logToFile(log_file_name,logLine);
 		}
 			
 		//do other changes here");

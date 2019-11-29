@@ -1,2 +1,0 @@
-unreachable dest 6
-unreachable dest 6

@@ -99,12 +99,13 @@ int main(int argc, char** argv)
 		if (globalMyID != nodeid) {
 			cost_matrix[globalMyID][nodeid] = cost;
 			cost_matrix[nodeid][globalMyID] = cost;
-		
+			printf("\ncost matrix [%d][%d] = %d",globalMyID,nodeid,cost);
 			node_list[node_size] = nodeid;
 			node_size = node_size + 1;
 		}		
 	}
 
+	printf("\nclosing file ...");
 	fclose(file);
 	
 	//printf("\nsocket() and bind() our socket. We will do all sendto()ing and recvfrom()ing on this one.0");
@@ -134,8 +135,12 @@ int main(int argc, char** argv)
 	pthread_create(&announcerThread, 0, announceToNeighbors, (void*)0);
 	
 	constructNetworkTopology(cost_matrix);	
+	calculateEfficientDistanceVector(node_size, cost_matrix);
+	
+	/*
 	pthread_t dvThread;
 	pthread_create(&dvThread, 0, invokeDVCalculation, (void*)0);
+	*/
 
 	//good luck, have fun!
 	listenForNeighbors();
