@@ -48,10 +48,18 @@ int main(int argc, char *argv[])
 
 	//1. validate http request + retrieve first half
 	strcpy(arg,argv[1]);
+
+	FILE *file;
+	file = fopen("output","w+");
+	if (file == NULL) {
+		printf("Error !");
+		exit(1);
+	}
 	
 	//protocol http validate
 	if (strncmp(arg,"http",4)) {
 		fprintf(stderr, "INVALIDPROTOCOL");
+		fprintf(file, "%s", "INVALIDPROTOCOL");
 		exit(1);
 	}
 
@@ -81,7 +89,27 @@ int main(int argc, char *argv[])
 	sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&on, sizeof(int));
 
-	close(sockfd);
+	if(sock == -1){
+		perror("setsockopt");
+		exit(1);
+	}
+	
+	if(connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_in)) == -1){
+		perror("connect");
+		exit(1);
+	}
+
+	write(sock, "GET /\r\n", strlen("GET /\r\n")); // write(fd, char[]*, len);  
+	bzero(buf, MAXDATASIZE);
+
+	while(read(sock, buf, MAXDATASIZE - 1) != 0){
+		fprintf(file, "%s", buf);
+		fprintf(stderr, "%s", buf);
+		bzero(buf, MAXDATASIZE);
+	}
+
+	shutdown(sock, SHUT_RDWR); 
+	close(sock); 
 
 	return 0;
 }
