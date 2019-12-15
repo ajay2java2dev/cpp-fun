@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 	char s[INET6_ADDRSTRLEN];
 	char arg[100];
 	struct hostent *hp;
-	struct sock_addr addr;
+	struct sockaddr_in addr;
 	int on = 1, sock;
 
 	if (argc != 2) {
