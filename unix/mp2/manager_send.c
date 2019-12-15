@@ -23,6 +23,9 @@ int main(int argc, char** argv)
 
 	short int destID = atoi(argv[3]);
 	short int no_destID = htons(destID);
+	
+	printf("\nDESTINATION ID : %d\n\n",destID);
+	printf("\nNO_DEST ID : %d\n\n",no_destID);
 
 	int senderSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if(senderSocket < 0)
@@ -51,9 +54,10 @@ int main(int argc, char** argv)
 
 	if(!strcmp(argv[2], "cost"))
 	{
+		printf ("\n !strcmp(argv[2] :%s\n",argv[2]);
 
 		int no_newCost = htonl(atoi(argv[4]));
-
+		
 		char sendBuf[4+sizeof(short int)+sizeof(int)];
 
 		strcpy(sendBuf, "cost");
@@ -66,6 +70,8 @@ int main(int argc, char** argv)
 	}
 	else
 	{
+		printf ("\n else :%s\n",argv[2]);
+
 		int msgLen = 4+sizeof(short int)+strlen(argv[4]);
 		char* sendBuf = malloc(msgLen);
 
